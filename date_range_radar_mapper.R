@@ -12,6 +12,11 @@ library("prettymapr")
 library("shiny")
 #library("ggiraph")
 
+
+
+# you need to filter your parquet by beginning end, collect, do cumulative calulations, then grab the last day for plotting.
+
+
 ######################## Some S3 things #####################
 # remove this from container setup, this gives your local dev the AWS access
 #readRenviron("../.Renviron") # this is for keys one level up from root directory
