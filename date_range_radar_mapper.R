@@ -37,13 +37,17 @@ stg4_24hr_texas_parq <- open_dataset(s3_path)
 
 stg4_24hr_texas_parq <- open_dataset(s3_path)
 
-begin_time_local <- "2025-01-01 7:00:00 CDT"
-end_time_local <- "2025-09-04 7:00:00 CDT"
+begin_time_local <- "2025-07-13 7:00:00 CDT"
+end_time_local <- "2025-07-16 7:00:00 CDT"
 
 
 
 d <- stg4_24hr_texas_parq |>
-  filter (year==2025) |>
+  #filter (year==2025) |>
+  filter(
+    year == 2025,
+    (month == 7 & day >= 13 & day <= 16)
+  )|>
   group_by (grib_id,month, day, year) %>%
   summarize(
     sum_rain = sum(rain_mm, na.rm=TRUE))|>
@@ -59,12 +63,15 @@ cp <- d |>
 map <- read_sf(paste0(".\\gis\\clipped_hrap\\","usgs_dissolved.shp")) 
 streams <- read_sf("./gis/streams_recharge.shp")
 lakes <- read_sf("./gis/reservoirs.shp")
+basins <- read_sf("./gis/usgs_basins.shp")
 
 map_rain <- map|>
   left_join(cp, by = "grib_id")|>
   mutate(cubic_m_precip = bin_area * sum_rain * 0.001)|>
-  mutate(sum_rain_in = sum_rain/25.4)|>
-  arrange(month,day)
+  mutate(sum_rain_in = cum_sum_rain/25.4)|>
+  arrange(month,day, sum_rain_in) |>
+  # filter day to map cumulative here.....
+  filter(month == 7 & day == 16)
 
 
 ################################################################ put function in
@@ -119,6 +126,17 @@ plot_bin_map<-function(
   rain_labels  <- c("0","0.1","0.25","0.5","1","2","3","4","6","8","10","12+")
   rain_limits  <- c(0, 12)
   
+  # --- Static legend settings (always show full range) ---
+ # rain_breaks  <- c(1, 2, 3, 5, 7, 9, 11, 13, 15, 17, 19, 20)
+#  rain_labels  <- c("1","2","3","5","7","9","11","13","15","17","19","20")
+ # rain_limits  <- c(1, 20)
+  
+  # --- Static legend settings (always show full range) ---
+  #rain_breaks  <- c(14, 16, 18, 20, 23, 26, 29, 31, 33, 35, 37, 40)
+  #rain_labels  <- c("14","16","18","20","23","26","29","31","33","35","37","40")
+  #rain_limits  <- c(14, 40)
+  
+  
   # --- Set 0 rainfall to NA for transparency ---
   map_rain <- map_rain |>
     mutate(fill_val = ifelse(sum_rain_in == 0, NA_real_, sum_rain_in))
@@ -133,8 +151,10 @@ plot_bin_map<-function(
     annotate(geom="text",x=  note_title_pos$X,y= note_title_pos$Y,label=note_title,size=2,hjust=0, color = pal_subtitle, family=font)+
     geom_sf(data = map_rain, mapping = aes(fill = fill_val), color = pal_bin_outline, alpha = bin_alpha, na.rm = FALSE) +
     geom_sf(data = outline|>st_transform(crs = coord_sys), color = pal_outline, linewidth = 0.4) +  
+   
+    geom_sf(data = basins|>st_transform(crs = coord_sys), color = alpha("black", 1), linewidth = 0.85, fill=NA) +
     geom_sf(data=map_lakes|>st_transform(crs = coord_sys), fill= pal_water, color= pal_water, linewidth = 0.2)+
-    geom_sf(data=map_streams|>st_transform(crs = coord_sys), color= pal_water)+
+    #geom_sf(data=map_streams|>st_transform(crs = coord_sys), color= pal_water)+
     
     scale_fill_stepsn(
       colours = c("#82D3F0","#0826A2","#22FE05","#248418",
